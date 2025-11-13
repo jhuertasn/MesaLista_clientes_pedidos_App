@@ -1,7 +1,7 @@
 // src/config/blockchainConfig.js
 
 // dirección de tu contrato desplegado en Ganache
-const contractAddress = '0x9c0fdb8C5E13135e88b8142604548fce0f2b6068';
+const contractAddress = '0x4fA01157E01A85B3825e0bbdbEC458dd91fd2B20';
 
 //Pega aquí el ABI de tu contrato
 const contractABI = [
@@ -76,6 +76,11 @@ const contractABI = [
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
 			{
 				"internalType": "string",
 				"name": "nombre",
@@ -307,20 +312,7 @@ const contractABI = [
 		],
 		"stateMutability": "view",
 		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "siguienteIdCliente",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
 	}
-];
+]
 
 module.exports = { contractAddress, contractABI };

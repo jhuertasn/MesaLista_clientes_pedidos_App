@@ -1,41 +1,100 @@
 // src/services/clienteBlockchainService.js
 
-const { Web3 } = require('web3');
+const { ethers } = require('ethers'); // Importamos ethers en lugar de web3
 const { contractAddress, contractABI } = require('../config/blockchainConfig');
 
-// Conectamos con Ganache
-const web3 = new Web3('http://127.0.0.1:7545');
-// Creamos la instancia del contrato
-const contract = new web3.eth.Contract(contractABI, contractAddress);
+// 1. Creamos un "Proveedor" para conectarnos a Ganache
+// Lee la URL de tu archivo .env
+const provider = new ethers.JsonRpcProvider(process.env.GANACHE_URL);
+
+// 2. Creamos una instancia del contrato (esta es de solo lectura)
+const contract = new ethers.Contract(contractAddress, contractABI, provider);
 
 class ClienteBlockchainService {
 
+    // Esta es una función auxiliar para obtener un contrato "con firma"
+    // Ethers separa "leer" de "escribir". Para escribir, necesitas un "Signer".
+    static async _getContractWithSigner(cuenta) {
+        // Obtenemos el "firmante" (signer) desde Ganache para la cuenta que nos dio el frontend
+        const signer = await provider.getSigner(cuenta);
+        // Conectamos ese firmante al contrato
+        return contract.connect(signer);
+    }
+
+    // --- FUNCIONES DE ESCRITURA (send) ---
+
     static async registrarCliente(datosCliente) {
-        const { cuenta, nombre, telefono, correo, direccion, tarjeta } = datosCliente;
-        console.log("Intentando registrar cliente en blockchain desde la cuenta:", cuenta);
-
+        const { cuenta, id, nombre, telefono, correo, direccion, tarjeta } = datosCliente;
+        console.log(`Intentando registrar cliente ${id} en BC desde ${cuenta}`);
         try {
-            const receipt = await contract.methods.registrarCliente(
-                nombre,
-                telefono,
-                correo,
-                direccion,
-                tarjeta
-            ).send({ from: cuenta, gas: '1000000' });
+            // Obtenemos el contrato listo para firmar y escribir
+            const contractWithSigner = await this._getContractWithSigner(cuenta);
 
-            console.log("Transacción exitosa:", receipt.transactionHash);
+            // La sintaxis de Ethers es más directa
+            const tx = await contractWithSigner.registrarCliente(
+                id, nombre, telefono, correo, direccion, tarjeta
+            );
+            // Esperamos a que la transacción se mine
+            const receipt = await tx.wait();
             return receipt;
         } catch (error) {
-            console.error("Error en registrarCliente Service:", error);
+            console.error("Error en registrarCliente Service (ethers):", error);
             throw error;
         }
     }
 
-    static async obtenerCliente(idCliente, cuenta) {
-        console.log(`Obteniendo cliente con ID ${idCliente} desde la cuenta ${cuenta}`);
+    static async registrarPedidoPago(datosPedido) {
+        const { cuenta, idCliente, hashPedido, importe } = datosPedido;
+        console.log(`Registrando pedido para cliente ${idCliente} desde ${cuenta}`);
         try {
-             const clienteData = await contract.methods.obtenerCliente(idCliente).call({ from: cuenta });
-            // Formateamos la respuesta para que sea un objeto JSON claro
+            const contractWithSigner = await this._getContractWithSigner(cuenta);
+            const tx = await contractWithSigner.registrarPedidoPago(
+                idCliente, hashPedido, importe
+            );
+            const receipt = await tx.wait();
+            return receipt;
+        } catch (error) {
+            console.error("Error en registrarPedidoPago Service (ethers):", error);
+            throw error;
+        }
+    }
+
+    static async borrarCliente(datosBorrado) {
+        const { cuenta, id } = datosBorrado;
+        console.log(`Intentando desactivar cliente ${id} desde ${cuenta}`);
+        try {
+            const contractWithSigner = await this._getContractWithSigner(cuenta);
+            const tx = await contractWithSigner.borrarCliente(id);
+            const receipt = await tx.wait();
+            return receipt;
+        } catch (error) {
+            console.error("Error en borrarCliente Service (ethers):", error);
+            throw error;
+        }
+    }
+
+    static async reactivarCliente(datosReactivar) {
+        const { cuenta, id } = datosReactivar;
+        console.log(`Intentando reactivar al cliente ${id} desde ${cuenta}`);
+        try {
+            const contractWithSigner = await this._getContractWithSigner(cuenta);
+            const tx = await contractWithSigner.actualizarEstado(id, true);
+            const receipt = await tx.wait();
+            return receipt;
+        } catch (error) {
+            console.error("Error en reactivarCliente Service (ethers):", error);
+            throw error;
+        }
+    }
+
+    // --- FUNCIONES DE LECTURA (call) ---
+    // Para leer datos, usamos la instancia de contrato normal (sin firmante)
+
+    static async obtenerCliente(idCliente, cuenta) {
+        console.log(`Obteniendo cliente con ID ${idCliente} (leído por ${cuenta})`);
+        try {
+            // La sintaxis de Ethers para leer es más simple
+            const clienteData = await contract.obtenerCliente(idCliente);
             return {
                 id: clienteData[0],
                 nombre: clienteData[1],
@@ -46,66 +105,30 @@ class ClienteBlockchainService {
                 activo: clienteData[6]
             };
         } catch (error) {
-            console.error("Error en obtenerCliente Service:", error);
+            console.error("Error en obtenerCliente Service (ethers):", error);
             throw error;
         }
     }
 
-    static async borrarCliente(datosBorrado) {
-        const { cuenta, id } = datosBorrado;
-        console.log(`Intentando desactivar cliente ${id} desde la cuenta ${cuenta}`);
+    static async obtenerHistorial(idCliente, cuenta) {
+        console.log(`Obteniendo historial para cliente ${idCliente} (leído por ${cuenta})`);
         try {
-            const receipt = await contract.methods.borrarCliente(id).send({ from: cuenta, gas: '1000000' });
-            console.log("Transacción de desactivación exitosa:", receipt.transactionHash);
-            return receipt;
+            // 1. Obtenemos el "array de arrays" crudo de la blockchain
+            const rawHistorial = await contract.obtenerHistorial(idCliente);
+
+            // 2. Lo mapeamos a un array de objetos JSON que el frontend entienda
+            const historialFormateado = rawHistorial.map(pago => {
+                return {
+                    id: pago[0], // Accedemos por índice
+                    hashPedido: pago[1],
+                    importe: pago[2],
+                    timestamp: pago[3]
+                };
+            });
+
+            return historialFormateado; // Devolvemos el array de objetos formateado
         } catch (error) {
-            console.error("Error en borrarCliente Service:", error);
-            throw error;
-        }
-    }
-
-    // NUEVO MÉTODO para registrar un pedido/pago
-    static async registrarPedidoPago(datosPedido) {
-        const { cuenta, idCliente, hashPedido, importe } = datosPedido;
-        console.log(`Registrando pedido para cliente ${idCliente} desde la cuenta ${cuenta}`);
-
-        try {
-            const receipt = await contract.methods.registrarPedidoPago(
-                idCliente,
-                hashPedido, // Debe ser un hash de 32 bytes (bytes32)
-                importe
-            ).send({ from: cuenta, gas: '1000000' });
-
-            console.log("Transacción de pedido exitosa:", receipt.transactionHash);
-            return receipt;
-        } catch (error) {
-            console.error("Error en registrarPedidoPago Service:", error);
-            throw error;
-        }
-    }
-
-    // NUEVO MÉTODO para obtener el historial de pedidos/pagos
-static async obtenerHistorial(idCliente, cuenta) { // <-- Añade 'cuenta'
-    console.log(`Obteniendo historial para cliente ${idCliente} desde la cuenta ${cuenta}`);
-    try {
-        // Añade { from: cuenta } a la llamada
-        const historial = await contract.methods.obtenerHistorial(idCliente).call({ from: cuenta });
-        return historial;
-    } catch (error) {
-        console.error("Error en obtenerHistorial Service:", error);
-        throw error;
-    }
-}
-
-    // AÑADIR ESTA FUNCIÓN para reactivar en la Blockchain
-    static async reactivarCliente(datosReactivar) {
-        const { cuenta, id } = datosReactivar;
-        console.log(`Intentando reactivar al cliente ${id} desde la cuenta ${cuenta}`);
-        try {
-            const receipt = await contract.methods.actualizarEstado(id, true).send({ from: cuenta, gas: '1000000' });
-            return receipt;
-        } catch (error) {
-            console.error("Error en reactivarCliente Service:", error);
+            console.error("Error en obtenerHistorial Service (ethers):", error);
             throw error;
         }
     }

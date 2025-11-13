@@ -1,0 +1,56 @@
+/* frontend/style.css */
+
+body {
+    /* Usamos un gradiente naranja suave como el de la captura */
+    background: linear-gradient(to bottom right,  #f2a939 , #da810d);
+    font-family: Arial, sans-serif;
+    min-height: 100vh;
+}
+
+/* El título principal "Mesalista" */
+.header-box {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+.header-box h1 {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.header-box p {
+    font-size: 1.1em;
+    color: #555;
+    margin: 0;
+}
+
+/* Ajuste para que tus tarjetas se vean como las de la captura */
+.card {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: none;
+    border-radius: 8px;
+}
+
+.table > thead th {
+    /* * Este es el gradiente naranja-dorado que usa tu compañero.
+     * Puedes ajustar los colores si lo prefieres.
+    */
+    background: linear-gradient(to bottom right, #f9a825, #f57f17);
+    
+    /* Cambia el color del texto del encabezado a blanco */
+    color: #f2a939;
+}
+
+/* * Nos aseguramos de que los elementos <th> (los títulos) 
+ * hereden el color blanco correctamente.
+*/
+.table > thead th {
+    color: white;
+    font-weight: 600;
+}

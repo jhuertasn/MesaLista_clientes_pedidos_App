@@ -94,14 +94,31 @@ function configurarControlesPaginacion() {
 }
 
 async function obtenerCuenta() {
-    const { value: cuenta } = await Swal.fire({
-        title: 'Ingrese su cuenta de Ganache',
-        input: 'text',
-        inputLabel: 'Se usará para firmar la transacción',
-        showCancelButton: true,
-        inputValidator: (value) => !value && '¡Necesitas escribir una cuenta!'
-    });
-    return cuenta;
+    
+    // 1. Revisa si MetaMask (o cualquier billetera compatible) está instalado
+    if (typeof window.ethereum === 'undefined') {
+        Swal.fire('Error', 'MetaMask no está instalado. Por favor, instala la extensión para continuar.', 'error');
+        return null;
+    }
+
+    try {
+        // 2. Solicita al usuario que conecte su billetera
+        // Esto abrirá la ventana emergente de MetaMask
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        // 3. Devuelve la primera cuenta conectada
+        if (accounts.length > 0) {
+            return accounts[0]; 
+        } else {
+            Swal.fire('Advertencia', 'No se autorizó ninguna cuenta. Por favor, conecta una cuenta en MetaMask.', 'warning');
+            return null;
+        }
+    } catch (error) {
+        // El usuario rechazó la conexión
+        console.error("Error al conectar con MetaMask:", error);
+        Swal.fire('Error', 'El usuario rechazó la conexión.', 'error');
+        return null;
+    }
 }
 
 async function registrarCliente(button) {

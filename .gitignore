@@ -1,2 +1,5 @@
 # Ignorar la carpeta de dependencias de Node.js
 backend/node_modules/
+
+# Archivo de variables de entorno del backend
+backend/.env

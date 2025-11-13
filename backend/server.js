@@ -1,5 +1,5 @@
 // server.js
-
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const clienteRoutes = require('./src/routes/clienteRoutes'); // Importamos nuestras rutas

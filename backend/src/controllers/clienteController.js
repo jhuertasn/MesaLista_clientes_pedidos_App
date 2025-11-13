@@ -60,7 +60,7 @@ const handleRegistrarCliente = async (req, res) => {
         // 2. (NUEVO) Guardar la cuenta usada en la Base de Datos
         await ClienteDbService.actualizarBlockchainAddress(id, cuenta);
 
-        res.status(200).json({ success: true, txHash: receipt.transactionHash });
+        res.status(200).json({ success: true, txHash: receipt.hash });
     } catch (error) {
         console.error("ERROR DETALLADO AL REGISTRAR CLIENTE EN BC:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -85,7 +85,7 @@ const handleBorrarCliente = async (req, res) => {
         await ClienteDbService.desactivarCliente(id);
         // Paso 2: Registrar el cambio en la Blockchain
         const receipt = await ClienteBlockchainService.borrarCliente({ id, cuenta });
-        res.status(200).json({ success: true, txHash: receipt.transactionHash });
+        res.status(200).json({ success: true, txHash: receipt.hash });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -110,7 +110,7 @@ const handleRegistrarPedidoPago = async (req, res) => {
         await PedidoDbService.actualizarHashPedido(nuevoPedidoId, hashPedido);
 
         // 5. Enviar respuesta exitosa
-        res.status(200).json({ success: true, txHash: receipt.transactionHash });
+        res.status(200).json({ success: true, txHash: receipt.hash });
     } catch (error) {
         console.error("ERROR DETALLADO AL REGISTRAR PAGO:", error);
         res.status(500).json({ success: false, message: error.message });
@@ -146,7 +146,7 @@ const handleReactivarCliente = async (req, res) => {
         await ClienteDbService.reactivarCliente(id);
         // 2. Reactivar en la blockchain
         const receipt = await ClienteBlockchainService.reactivarCliente({ id, cuenta });
-        res.status(200).json({ success: true, txHash: receipt.transactionHash });
+        res.status(200).json({ success: true, txHash: receipt.hash });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
