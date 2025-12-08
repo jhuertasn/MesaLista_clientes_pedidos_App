@@ -56,6 +56,14 @@ static async crearCliente(cliente) {
     await pool.query('UPDATE clientes SET blockchain_address = ? WHERE id = ?', [direccion, id]);
     console.log(`Dirección de blockchain actualizada para el cliente ID ${id}`);
 }
+
+static async actualizarCidPdf(id, cid) {
+        const query = 'UPDATE clientes SET cid_pdf = ? WHERE id = ?';
+        // Asegúrate de usar 'db' aquí, igual que en el require de arriba
+        const [result] = await pool.execute(query, [cid, id]); 
+        return result;
+    }
+
 }
 
 module.exports = ClienteDbService;

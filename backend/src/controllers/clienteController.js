@@ -1,5 +1,7 @@
 // src/controllers/clienteController.js
-
+const axios = require('axios');
+const FormData = require('form-data');
+const PDFDocument = require('pdfkit');
 const crypto = require('crypto');
 const ClienteBlockchainService = require('../services/clienteBlockchainService');
 const ClienteDbService = require('../services/clienteDbService');
@@ -97,7 +99,7 @@ const handleRegistrarPedidoPago = async (req, res) => {
         const dbResult = await PedidoDbService.registrarPedidoEnDb(req.body);
         const nuevoPedidoId = dbResult.insertId;
 
-        // 2. Generar el Hash a partir de los datos del pedido
+        // 2. Generar el Hash a partir de los datos del pedido (Se cumplio requisiro AA4)
         const datosParaHash = `${nuevoPedidoId}-${req.body.idCliente}-${req.body.importe}`;
         const hashPedido = '0x' + crypto.createHash('sha256').update(datosParaHash).digest('hex');
         console.log(`Hash generado para el pedido ${nuevoPedidoId}: ${hashPedido}`);
@@ -152,6 +154,89 @@ const handleReactivarCliente = async (req, res) => {
     }
 };
 
+// --- NUEVO HANDLER PARA SUBIR A IPFS (PUENTE) ---
+const handleSubirIPFS = async (req, res) => {
+    try {
+        const { id, nombre, telefono, correo } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: "Falta ID del cliente" });
+        }
+
+        // 1. VERIFICAR SI YA EXISTE EL PDF
+        const clienteDb = await ClienteDbService.obtenerClientePorId(id);
+        
+        if (clienteDb && clienteDb.cid_pdf) {
+            console.log(`Cliente ${id} ya tiene PDF. CID recuperado: ${clienteDb.cid_pdf}`);
+            return res.status(200).json({ success: true, cid: clienteDb.cid_pdf });
+        }
+
+        // 2. SI NO EXISTE, LO GENERAMOS (Lógica que ya tenías)
+        const doc = new PDFDocument();
+        let buffers = [];
+
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', async () => {
+            const pdfBuffer = Buffer.concat(buffers);
+
+            try {
+                const form = new FormData();
+                form.append('file', pdfBuffer, { filename: `reporte_${id}.pdf`, contentType: 'application/pdf' });
+
+                const response = await axios.post('http://127.0.0.1:5001/api/v0/add', form, {
+                    headers: { ...form.getHeaders() }
+                });
+
+                const cid = response.data.Hash;
+                
+                // 3. ¡GUARDAR EL CID EN LA BD! (El paso nuevo)
+                await ClienteDbService.actualizarCidPdf(id, cid);
+                console.log(`Nuevo PDF generado y guardado en BD. CID: ${cid}`);
+
+                return res.status(200).json({ success: true, cid: cid });
+
+            } catch (ipfsError) {
+                console.error("Error IPFS:", ipfsError);
+                return res.status(500).json({ success: false, message: "Error IPFS" });
+            }
+        });
+
+// --- DISEÑO DEL PDF COMPLETO ---
+        // Encabezado
+        doc.fontSize(20).fillColor('#E67E22').text('MesaLista - Reporte de Cliente', { align: 'center' });
+        doc.moveDown();
+        
+        // Línea separadora
+        doc.moveTo(50, 100).lineTo(550, 100).strokeColor('#aaaaaa').stroke();
+        doc.moveDown();
+
+        // Datos del Cliente
+        doc.fontSize(14).fillColor('black').text('Detalles del Cliente:', { underline: true });
+        doc.moveDown(0.5);
+        
+        doc.fontSize(12).fillColor('black');
+        doc.text(`ID del Cliente: ${id}`);
+        doc.moveDown(0.5);
+        doc.text(`Nombre Completo: ${nombre}`);
+        doc.moveDown(0.5);
+        doc.text(`Teléfono: ${telefono}`);
+        doc.moveDown(0.5);
+        doc.text(`Correo Electrónico: ${correo}`);
+        
+        // Pie de página
+        doc.moveDown(4);
+        doc.fontSize(10).fillColor('gray').text('Documento generado y respaldado en IPFS.', { align: 'center' });
+        doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, { align: 'center' });
+        
+        // Finalizar el PDF
+        doc.end();
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: "Error servidor" });
+    }
+};
+
 module.exports = {
     handleObtenerClientesDeDb,
     handleCrearCliente,
@@ -163,5 +248,6 @@ module.exports = {
     handleRegistrarPedidoPago,
     handleObtenerHistorial,
     handleObtenerHistorialDeDb,
-    handleReactivarCliente
+    handleReactivarCliente,
+    handleSubirIPFS
 };

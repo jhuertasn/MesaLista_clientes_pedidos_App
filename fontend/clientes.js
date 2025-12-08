@@ -55,6 +55,7 @@ function mostrarPagina(pagina) {
                 <button class="btn btn-sm btn-outline-info" onclick="editar(${cliente.id})">✏️ EDITAR</button>
                 <button class="btn btn-sm btn-success" onclick="registrarCliente(this)">REGISTRAR BC</button>
                 <button class="btn btn-sm btn-warning" onclick="validarCliente(${cliente.id})">VALIDAR BC</button>
+                <button class="btn btn-sm btn-secondary" onclick="generarYSubirPDF('${cliente.id}', '${cliente.nombre}', '${cliente.telefono}', '${cliente.correo}')">📄 PDF</button>
                 <button class="btn btn-sm btn-danger" onclick="eliminarCliente(${cliente.id})">ELIMINAR</button>
             `;
         } else {
@@ -340,5 +341,86 @@ async function consultarHistorial() {
 
     } catch (error) {
         Swal.fire('Error', 'No se pudo validar el historial.', 'error');
+    }
+}
+
+// --- FUNCIONES NUEVAS PARA PDF Y IPFS ---
+
+async function generarYSubirPDF(id, nombre, telefono, correo) {
+    try {
+        Swal.fire({
+            title: 'Generando PDF en Servidor...',
+            text: 'Creando documento y subiendo a IPFS...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading() }
+        });
+
+        // Enviamos solo los DATOS al backend
+        const response = await axios.post(`${API_URL}/ipfs/subir`, {
+            id: id,
+            nombre: nombre,
+            telefono: telefono,
+            correo: correo
+        });
+
+        if (response.data.success) {
+            const cid = response.data.cid;
+            const url = `https://ipfs.io/ipfs/${cid}`; // Gateway público
+            // Opcional: Usar tu gateway local si el público es lento:
+            // const url = `http://127.0.0.1:8080/ipfs/${cid}`; 
+            
+            Swal.fire({
+                title: '¡PDF Generado y Subido!',
+                html: `
+                    <p>Documento seguro en IPFS.</p>
+                    <p><strong>CID:</strong> ${cid}</p>
+                    <a href="${url}" target="_blank" class="btn btn-success">👁️ Ver PDF</a>
+                `,
+                icon: 'success'
+            });
+        } else {
+            throw new Error(response.data.message);
+        }
+
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo generar el PDF. Revisa que el Backend esté corriendo.', 'error');
+    }
+}
+
+async function subirIPFSViaBackend(base64String) {
+    try {
+        Swal.fire({
+            title: 'Subiendo a IPFS...',
+            text: 'Procesando vía Servidor...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading() }
+        });
+
+        // Hacemos POST a TU backend, no a IPFS directo
+        const response = await axios.post(`${API_URL}/ipfs/subir`, {
+            pdfBase64: base64String
+        });
+
+        if (response.data.success) {
+            const cid = response.data.cid;
+            const url = `https://ipfs.io/ipfs/${cid}`;
+
+            Swal.fire({
+                title: '¡Éxito!',
+                html: `
+                    <p>Archivo subido a IPFS correctamente.</p>
+                    <p><strong>CID:</strong> ${cid}</p>
+                    <a href="${url}" target="_blank" class="btn btn-success">Ver PDF</a>
+                `,
+                icon: 'success'
+            });
+        } else {
+            throw new Error(response.data.message);
+        }
+
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo subir a IPFS. Revisa que el Backend y IPFS Desktop estén corriendo.', 'error');
     }
 }

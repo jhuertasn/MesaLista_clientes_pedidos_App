@@ -13,6 +13,7 @@ const {
     handleRegistrarPedidoPago,
     handleObtenerHistorial,
     handleObtenerHistorialDeDb,
+    handleSubirIPFS,
     handleReactivarCliente // Asegúrate de tener este handler si implementaste la reactivación
 } = require('../controllers/clienteController');
 
@@ -35,5 +36,7 @@ router.post('/pedidos/registrar', handleRegistrarPedidoPago);      // Registrar 
 router.get('/pedidos/historial/:idCliente', handleObtenerHistorial);  // Consultar historial desde la Blockchain
 router.get('/pedidos/historial/db/:idCliente', handleObtenerHistorialDeDb); // Consultar historial desde la BD (para la validación)
 
+// Nueva ruta para el puente IPFS
+router.post('/ipfs/subir', handleSubirIPFS);  
 
 module.exports = router;
