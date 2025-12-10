@@ -14,7 +14,9 @@ const {
     handleObtenerHistorial,
     handleObtenerHistorialDeDb,
     handleSubirIPFS,
-    handleReactivarCliente // Asegúrate de tener este handler si implementaste la reactivación
+    handleReactivarCliente,
+    handleMintearNFT,
+    handleVerNFT // Asegúrate de tener este handler si implementaste la reactivación
 } = require('../controllers/clienteController');
 
 // --- Rutas para el CRUD de Clientes en la Base de Datos (MySQL) ---
@@ -38,5 +40,9 @@ router.get('/pedidos/historial/db/:idCliente', handleObtenerHistorialDeDb); // C
 
 // Nueva ruta para el puente IPFS
 router.post('/ipfs/subir', handleSubirIPFS);  
+
+// Lineas de NFT
+router.post('/nft/mintear', handleMintearNFT);
+router.get('/nft/:tokenId', handleVerNFT);
 
 module.exports = router;

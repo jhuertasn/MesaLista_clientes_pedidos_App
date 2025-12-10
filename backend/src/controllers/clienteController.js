@@ -1,7 +1,8 @@
 // src/controllers/clienteController.js
 const axios = require('axios');
 const FormData = require('form-data');
-const PDFDocument = require('pdfkit');
+const ClienteNFTService = require('../services/clienteNFTService');
+const ClientePdfService = require('../services/clientePdfService');
 const crypto = require('crypto');
 const ClienteBlockchainService = require('../services/clienteBlockchainService');
 const ClienteDbService = require('../services/clienteDbService');
@@ -159,81 +160,90 @@ const handleSubirIPFS = async (req, res) => {
     try {
         const { id, nombre, telefono, correo } = req.body;
 
-        if (!id) {
-            return res.status(400).json({ success: false, message: "Falta ID del cliente" });
-        }
+        if (!id) return res.status(400).json({ success: false, message: "Falta ID" });
 
-        // 1. VERIFICAR SI YA EXISTE EL PDF
+        // 1. VERIFICAR SI YA EXISTE
         const clienteDb = await ClienteDbService.obtenerClientePorId(id);
-        
         if (clienteDb && clienteDb.cid_pdf) {
-            console.log(`Cliente ${id} ya tiene PDF. CID recuperado: ${clienteDb.cid_pdf}`);
+            console.log(`Cliente ${id} ya tiene PDF. CID: ${clienteDb.cid_pdf}`);
             return res.status(200).json({ success: true, cid: clienteDb.cid_pdf });
         }
 
-        // 2. SI NO EXISTE, LO GENERAMOS (Lógica que ya tenías)
-        const doc = new PDFDocument();
-        let buffers = [];
+        // 2. GENERAR PDF (Usando el nuevo servicio)
+        console.log("Generando PDF nuevo...");
+        const pdfBuffer = await ClientePdfService.generarPDF({ id, nombre, telefono, correo });
 
-        doc.on('data', buffers.push.bind(buffers));
-        doc.on('end', async () => {
-            const pdfBuffer = Buffer.concat(buffers);
+        // 3. SUBIR A IPFS
+        const form = new FormData();
+        form.append('file', pdfBuffer, { filename: `reporte_${id}.pdf`, contentType: 'application/pdf' });
 
-            try {
-                const form = new FormData();
-                form.append('file', pdfBuffer, { filename: `reporte_${id}.pdf`, contentType: 'application/pdf' });
-
-                const response = await axios.post('http://127.0.0.1:5001/api/v0/add', form, {
-                    headers: { ...form.getHeaders() }
-                });
-
-                const cid = response.data.Hash;
-                
-                // 3. ¡GUARDAR EL CID EN LA BD! (El paso nuevo)
-                await ClienteDbService.actualizarCidPdf(id, cid);
-                console.log(`Nuevo PDF generado y guardado en BD. CID: ${cid}`);
-
-                return res.status(200).json({ success: true, cid: cid });
-
-            } catch (ipfsError) {
-                console.error("Error IPFS:", ipfsError);
-                return res.status(500).json({ success: false, message: "Error IPFS" });
-            }
+        const response = await axios.post('http://127.0.0.1:5001/api/v0/add', form, {
+            headers: { ...form.getHeaders() }
         });
 
-// --- DISEÑO DEL PDF COMPLETO ---
-        // Encabezado
-        doc.fontSize(20).fillColor('#E67E22').text('MesaLista - Reporte de Cliente', { align: 'center' });
-        doc.moveDown();
-        
-        // Línea separadora
-        doc.moveTo(50, 100).lineTo(550, 100).strokeColor('#aaaaaa').stroke();
-        doc.moveDown();
+        const cid = response.data.Hash;
 
-        // Datos del Cliente
-        doc.fontSize(14).fillColor('black').text('Detalles del Cliente:', { underline: true });
-        doc.moveDown(0.5);
+        // 4. GUARDAR EN BD
+        await ClienteDbService.actualizarCidPdf(id, cid);
+        console.log(`PDF subido a IPFS y guardado. CID: ${cid}`);
+
+        res.status(200).json({ success: true, cid: cid });
+
+    } catch (error) {
+        console.error("Error en proceso PDF/IPFS:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- NUEVOS HANDLERS NFT ---
+const handleMintearNFT = async (req, res) => {
+    try {
+        const { id, nombre, cuenta, cid_pdf } = req.body;
         
-        doc.fontSize(12).fillColor('black');
-        doc.text(`ID del Cliente: ${id}`);
-        doc.moveDown(0.5);
-        doc.text(`Nombre Completo: ${nombre}`);
-        doc.moveDown(0.5);
-        doc.text(`Teléfono: ${telefono}`);
-        doc.moveDown(0.5);
-        doc.text(`Correo Electrónico: ${correo}`);
-        
-        // Pie de página
-        doc.moveDown(4);
-        doc.fontSize(10).fillColor('gray').text('Documento generado y respaldado en IPFS.', { align: 'center' });
-        doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, { align: 'center' });
-        
-        // Finalizar el PDF
-        doc.end();
+        if (!cid_pdf) return res.status(400).json({ success: false, message: "Falta PDF" });
+
+        let tokenId;
+        let txHash = "Ya existía en Blockchain"; // Mensaje por defecto si recuperamos
+
+        try {
+            // Intento 1: Mintear normal
+            const result = await ClienteNFTService.mintNFT(cuenta, id, nombre, cid_pdf);
+            tokenId = result.tokenId;
+            txHash = result.receipt.hash;
+
+        } catch (error) {
+            // Si falla, verificamos si es porque "Ya existe"
+            console.warn("Minteo falló, intentando recuperar...", error.message);
+            
+            // Consultamos a la blockchain si este cliente ya tiene token
+            tokenId = await ClienteNFTService.obtenerTokenIdPorCliente(id);
+
+            if (!tokenId) {
+                // Si no tiene token y falló, entonces es un error real
+                throw error; 
+            }
+            console.log(`Recuperado Token ID ${tokenId} de la blockchain.`);
+        }
+
+        // 2. Guardar en BD (Sea nuevo o recuperado)
+        await ClienteDbService.actualizarTokenId(id, tokenId);
+
+        res.status(200).json({ success: true, tokenId: tokenId, txHash: txHash });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, message: "Error servidor" });
+        // Mejoramos el mensaje de error para el frontend
+        const msg = error.info?.error?.message || error.message;
+        res.status(500).json({ success: false, message: "Error Blockchain: " + msg });
+    }
+};
+
+const handleVerNFT = async (req, res) => {
+    try {
+        const data = await ClienteNFTService.getMetadata(req.params.tokenId);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Error al leer NFT" });
     }
 };
 
@@ -249,5 +259,7 @@ module.exports = {
     handleObtenerHistorial,
     handleObtenerHistorialDeDb,
     handleReactivarCliente,
-    handleSubirIPFS
+    handleSubirIPFS,
+    handleMintearNFT,
+    handleVerNFT
 };

@@ -5,10 +5,10 @@ const pool = require('../db/db');
 class ClienteDbService {
     // Obtiene solo los clientes activos e inactivos para mostrar en la lista principal
 static async obtenerTodosLosClientes() {
-    // Quitamos el filtro para obtener TODOS los clientes (activos e inactivos)
-    const [rows] = await pool.query('SELECT id, nombre, telefono, correo, direccion, tarjeta, activo FROM clientes');
-    return rows;
-}
+        // CORRECCIÓN: Usamos SELECT * para traer nft_token_id, cid_pdf, etc.
+        const [rows] = await pool.query('SELECT * FROM clientes');
+        return rows;
+    }
 
     // Obtiene un solo cliente por su ID (para el formulario de edición)
     static async obtenerClientePorId(id) {
@@ -59,8 +59,15 @@ static async crearCliente(cliente) {
 
 static async actualizarCidPdf(id, cid) {
         const query = 'UPDATE clientes SET cid_pdf = ? WHERE id = ?';
-        // Asegúrate de usar 'db' aquí, igual que en el require de arriba
+        // Asegúrate de usar 'pool' aquí, igual que en el require de arriba
         const [result] = await pool.execute(query, [cid, id]); 
+        return result;
+    }
+
+    static async actualizarTokenId(idCliente, tokenId) {
+        // Guardamos el ID del NFT en la columna nueva
+        const query = 'UPDATE clientes SET nft_token_id = ? WHERE id = ?';
+        const [result] = await pool.execute(query, [tokenId, idCliente]);
         return result;
     }
 

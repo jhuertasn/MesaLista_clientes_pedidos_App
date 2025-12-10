@@ -1,9 +1,4 @@
-// src/config/blockchainConfig.js
-
-// dirección de tu contrato desplegado en Ganache
-const contractAddress = '0xF1950f4C81882e211798270f160Ae5f38646AE7F';
-
-//Pega aquí el ABI de tu contrato
+//Pega aquí el ABI de tu contrato blockchain
 const contractABI = [
 	{
 		"inputs": [
@@ -70,67 +65,6 @@ const contractABI = [
 			}
 		],
 		"name": "borrarCliente",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "id",
-				"type": "uint256"
-			},
-			{
-				"internalType": "string",
-				"name": "nombre",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "telefono",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "correo",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "direccion",
-				"type": "string"
-			},
-			{
-				"internalType": "string",
-				"name": "tarjeta",
-				"type": "string"
-			}
-		],
-		"name": "registrarCliente",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "idCliente",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "hashPedido",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "uint256",
-				"name": "importe",
-				"type": "uint256"
-			}
-		],
-		"name": "registrarPedidoPago",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -312,7 +246,73 @@ const contractABI = [
 		],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "id",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "nombre",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "telefono",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "correo",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "direccion",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "tarjeta",
+				"type": "string"
+			}
+		],
+		"name": "registrarCliente",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "idCliente",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "hashPedido",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "importe",
+				"type": "uint256"
+			}
+		],
+		"name": "registrarPedidoPago",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	}
 ]
+// dirección de tu contrato desplegado en Ganache
+const contractAddress = '0x005B202f2Ea143a0bDdbD3f3B3B24691adc018CE';
 
-module.exports = { contractAddress, contractABI };
+module.exports = {
+	 contractAddress,
+     contractABI
+	 };

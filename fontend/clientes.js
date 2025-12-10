@@ -42,21 +42,28 @@ function mostrarPagina(pagina) {
 
     clientesPaginados.forEach(cliente => {
         const row = document.createElement('tr');
-        if (cliente.activo === 0) {
-            row.classList.add('table-secondary', 'text-muted');
-        }
+        
+        if (cliente.activo === 0) row.classList.add('table-secondary', 'text-muted');
+        
         Object.keys(cliente).forEach(key => {
             row.setAttribute(`data-${key}`, cliente[key]);
         });
 
+        // Preparamos el ID del token (si es null, pasamos 'null' texto para controlarlo)
+        const tokenIdSafe = cliente.nft_token_id ? cliente.nft_token_id : 'null';
+
         let botones = '';
         if (cliente.activo === 1) {
             botones = `
-                <button class="btn btn-sm btn-outline-info" onclick="editar(${cliente.id})">✏️ EDITAR</button>
+                <button class="btn btn-sm btn-outline-info" title="Editar" onclick="editar(${cliente.id})">✏️</button>
                 <button class="btn btn-sm btn-success" onclick="registrarCliente(this)">REGISTRAR BC</button>
                 <button class="btn btn-sm btn-warning" onclick="validarCliente(${cliente.id})">VALIDAR BC</button>
                 <button class="btn btn-sm btn-secondary" onclick="generarYSubirPDF('${cliente.id}', '${cliente.nombre}', '${cliente.telefono}', '${cliente.correo}')">📄 PDF</button>
-                <button class="btn btn-sm btn-danger" onclick="eliminarCliente(${cliente.id})">ELIMINAR</button>
+                
+                <button class="btn btn-sm btn-primary" onclick="mintearNFT('${cliente.id}', '${cliente.nombre}', '${cliente.cid_pdf}')">MINTEAR NFT</button>
+                <button class="btn btn-sm btn-info" onclick="verNFT(${tokenIdSafe})">VER NFT</button>
+
+                <button class="btn btn-sm btn-danger" title="Eliminar" onclick="eliminarCliente(${cliente.id})">🗑️</button>
             `;
         } else {
             botones = `
@@ -64,9 +71,11 @@ function mostrarPagina(pagina) {
                 <button class="btn btn-sm btn-warning" onclick="validarCliente(${cliente.id})">VALIDAR BC</button>
             `;
         }
+        
         row.innerHTML = `<td>${cliente.id}</td><td>${cliente.nombre}</td><td>${cliente.telefono}</td><td>${botones}</td>`;
         tableBody.appendChild(row);
     });
+    
     configurarControlesPaginacion();
 }
 
@@ -95,8 +104,7 @@ function configurarControlesPaginacion() {
 }
 
 async function obtenerCuenta() {
-    
-    // 1. Revisa si MetaMask (o cualquier billetera compatible) está instalado
+    // 1. Revisa si MetaMask está instalado
     if (typeof window.ethereum === 'undefined') {
         Swal.fire('Error', 'MetaMask no está instalado. Por favor, instala la extensión para continuar.', 'error');
         return null;
@@ -104,18 +112,28 @@ async function obtenerCuenta() {
 
     try {
         // 2. Solicita al usuario que conecte su billetera
-        // Esto abrirá la ventana emergente de MetaMask
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         
         // 3. Devuelve la primera cuenta conectada
         if (accounts.length > 0) {
-            return accounts[0]; 
+            const cuenta = accounts[0];
+
+            // --- AQUÍ ES EL LUGAR CORRECTO PARA ACTUALIZAR EL HTML ---
+            // Solo intentamos actualizar si el elemento existe en el HTML
+            const visualizadorCuenta = document.getElementById('wallet-address');
+            if (visualizadorCuenta) {
+                visualizadorCuenta.innerText = cuenta.substring(0, 6) + '...' + cuenta.substring(38);
+                visualizadorCuenta.style.color = '#e67e22'; // Naranja
+                visualizadorCuenta.style.fontWeight = 'bold';
+            }
+            // ---------------------------------------------------------
+
+            return cuenta; 
         } else {
-            Swal.fire('Advertencia', 'No se autorizó ninguna cuenta. Por favor, conecta una cuenta en MetaMask.', 'warning');
+            Swal.fire('Advertencia', 'No se autorizó ninguna cuenta.', 'warning');
             return null;
         }
     } catch (error) {
-        // El usuario rechazó la conexión
         console.error("Error al conectar con MetaMask:", error);
         Swal.fire('Error', 'El usuario rechazó la conexión.', 'error');
         return null;
@@ -125,21 +143,40 @@ async function obtenerCuenta() {
 async function registrarCliente(button) {
     const fila = button.closest('tr');
     const cliente = {
-        id: fila.getAttribute('data-id'), // <-- CORRECCIÓN: Se envía el ID para sincronizar
+        id: fila.getAttribute('data-id'),
         nombre: fila.getAttribute('data-nombre'),
         telefono: fila.getAttribute('data-telefono'),
         correo: fila.getAttribute('data-correo'),
         direccion: fila.getAttribute('data-direccion'),
         tarjeta: fila.getAttribute('data-tarjeta')
     };
+    
     const cuenta = await obtenerCuenta();
     if (!cuenta) return;
-    Swal.fire({ title: 'Registrando Cliente...', didOpen: () => Swal.showLoading() });
+    
+    Swal.fire({ title: 'Registrando en Blockchain...', text: 'Firmando transacción...', didOpen: () => Swal.showLoading() });
+    
     try {
         const response = await axios.post(`${API_URL}/registrar`, { ...cliente, cuenta });
-        Swal.fire('¡Éxito!', `Cliente registrado. Tx: ${response.data.txHash}`, 'success');
+        
+        // --- CAMBIO: Mostrar Hash en la alerta ---
+        const txHash = response.data.txHash;
+        
+        Swal.fire({
+            title: '¡Registro Exitoso!',
+            html: `
+                <p>El cliente se ha guardado en la Blockchain.</p>
+                <p><strong>Hash de Transacción:</strong></p>
+                <small style="font-family: monospace; color: #28a745;">${txHash}</small>
+            `,
+            icon: 'success'
+        });
+        
+        // Recargar tabla para actualizar estado
+        cargarClientesDesdeDB();
+        
     } catch (error) {
-        Swal.fire('Error', error.response.data.message || error.message, 'error');
+        Swal.fire('Error', error.response?.data?.message || error.message, 'error');
     }
 }
 
@@ -378,6 +415,7 @@ async function generarYSubirPDF(id, nombre, telefono, correo) {
                 `,
                 icon: 'success'
             });
+            cargarClientesDesdeDB();
         } else {
             throw new Error(response.data.message);
         }
@@ -422,5 +460,77 @@ async function subirIPFSViaBackend(base64String) {
     } catch (error) {
         console.error(error);
         Swal.fire('Error', 'No se pudo subir a IPFS. Revisa que el Backend y IPFS Desktop estén corriendo.', 'error');
+    }
+}
+
+async function mintearNFT(id, nombre, cidPdf) {
+    const cuenta = await obtenerCuenta();
+    if(!cuenta) return;
+
+    if (!cidPdf || cidPdf === "null") {
+        Swal.fire('Atención', 'Primero debes generar el PDF.', 'warning');
+        return;
+    }
+
+    Swal.fire({ title: 'Minteando NFT...', text: 'Firmando transacción...', didOpen: () => Swal.showLoading() });
+
+    try {
+        const response = await axios.post(`${API_URL}/nft/mintear`, {
+            id, nombre, cuenta, cid_pdf: cidPdf
+        });
+        
+        // --- AQUÍ ESTÁ EL CAMBIO PARA MOSTRAR EL HASH ---
+        const txHash = response.data.txHash;
+        const txCorto = txHash.substring(0, 15) + "..."; // Lo acortamos para que se vea bien
+
+        Swal.fire({
+            title: '¡NFT Creado Exitosamente!',
+            html: `
+                <p><strong>Token ID:</strong> ${response.data.tokenId}</p>
+                <p><strong>Transacción (Hash):</strong> <br>
+                <span style="font-family: monospace; color: #e67e22;">${txHash}</span></p>
+            `,
+            icon: 'success'
+        });
+
+        cargarClientesDesdeDB(); 
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'No se pudo mintear. Revisa la consola.', 'error');
+    }
+}
+
+async function verNFT(tokenId) {
+    // Validación de seguridad para la demo
+    if (tokenId === null || tokenId === 'null' || tokenId === 0) {
+        Swal.fire('Aviso', 'Este cliente aún no tiene un NFT minteado.', 'info');
+        return;
+    }
+
+    Swal.fire({ title: 'Consultando Blockchain...', text: 'Leyendo activo digital...', didOpen: () => Swal.showLoading() });
+    
+    try {
+        const response = await axios.get(`${API_URL}/nft/${tokenId}`);
+        const d = response.data.data;
+        
+        Swal.fire({
+            title: '💎 Propiedad Digital (NFT)',
+            html: `
+                <div style="text-align:left; font-size: 1.1em;">
+                    <p><strong>Token ID:</strong> <span style="color:blue">${d.tokenId}</span></p>
+                    <p><strong>Cliente:</strong> ${d.nombre}</p>
+                    <p><strong>Propietario:</strong> <br><small style="font-family:monospace">${d.owner}</small></p>
+                    <p><strong>Fecha Minteo:</strong> ${new Date(d.timestamp * 1000).toLocaleString()}</p>
+                    <hr>
+                    <div style="text-align:center">
+                        <a href="http://127.0.0.1:8080/ipfs/${d.hashPdf}" target="_blank" class="btn btn-success">📄 Ver Documento Original</a>
+                    </div>
+                </div>
+            `,
+            icon: 'info'
+        });
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Error', 'No se pudo leer el NFT.', 'error');
     }
 }
