@@ -1,5 +1,5 @@
 // Pega aquí el ABI que copiaste de ClienteNFT
-const nftABI = [
+const contractABI = [
 	{
 		"inputs": [
 			{
@@ -279,12 +279,12 @@ const nftABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
-]
+];
 
 // --- NUEVO: Configuración NFT ---
-const nftAddress = '0x310160007752A1f809A62977E72d6Aa840C48ad5';
+const contractAddress = '0x7c3Ba6f75F8f02Cc5383224F83CBDde954ddE4B8';
 
 module.exports = {
-	nftABI, 
-    nftAddress
+	contractABI, 
+    contractAddress
 	 };

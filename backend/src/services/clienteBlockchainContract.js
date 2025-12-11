@@ -310,7 +310,7 @@ const contractABI = [
 	}
 ]
 // dirección de tu contrato desplegado en Ganache
-const contractAddress = '0x005B202f2Ea143a0bDdbD3f3B3B24691adc018CE';
+const contractAddress = '0xeE7d5562956683493Bf560db7E60cDA4a1E4F78C';
 
 module.exports = {
 	 contractAddress,
