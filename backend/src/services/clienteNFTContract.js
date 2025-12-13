@@ -282,7 +282,7 @@ const contractABI = [
 ];
 
 // --- NUEVO: Configuración NFT ---
-const contractAddress = '0x7c3Ba6f75F8f02Cc5383224F83CBDde954ddE4B8';
+const contractAddress = '0x8DaB85Df2637F32cDF2c1C1B6762568670C2780B';
 
 module.exports = {
 	contractABI, 
